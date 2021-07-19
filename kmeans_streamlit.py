@@ -107,3 +107,5 @@ if __name__ == '__main__':
     # fig = plotting_clusters_plotly(df_normalized,this_label,centroids,parameter)
     # iplot(fig, filename='3d point clustering')
     print("Done")
+    # TODO: precision, recall and f1 measure for all different combination of 3 parameters
+    # Source: https://www.guavus.com/technical-blog/unsupervised-machine-learning-validation-techniques/
