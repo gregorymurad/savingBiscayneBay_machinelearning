@@ -106,7 +106,4 @@ if __name__ == '__main__':
     """Plotting the clusters"""
     # fig = plotting_clusters_plotly(df_normalized,this_label,centroids,parameter)
     # iplot(fig, filename='3d point clustering')
-    del df_all
-    del df_training_
-    del df_
     print("Done")
