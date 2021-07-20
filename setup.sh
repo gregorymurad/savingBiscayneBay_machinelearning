@@ -3,3 +3,8 @@ pip install numpy
 pip install plotly
 pip install chart_studio
 pip install sklearn
+pip install jupyter
+pip install seaborn
+pip install matplotlib
+pip install scipy
+pip install kneed
