@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from plotly.offline import init_notebook_mode, iplot
 from sklearn import preprocessing
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
@@ -7,6 +8,8 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
 from kneed import KneeLocator
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
 class KmeansModel:
     def __init__(self, X, maxRange):
@@ -21,7 +24,6 @@ class KmeansModel:
         for k in range(1, self.maxRange):
             # Building and fitting the model
             kmeanModel = KMeans(n_clusters=k).fit(self.X)
-            kmeanModel.fit(self.X)
 
             self.distortions.append(sum(np.min(cdist(self.X, kmeanModel.cluster_centers_,
                                                 'euclidean'), axis=1)) / self.X.shape[0])
@@ -79,17 +81,17 @@ def standardize(df_training_):
     # print(df_norm.shape)
     return df_norm
 
-def kmeans_method(df_norm):
+def kmeans_method(df_norm, k):
     # Trying fit_predict
-    kmeans = KMeans(n_clusters=3,random_state=5) # Lu's
-    # kmeans = KMeans(n_clusters=3, random_state=134) # Greg's
+    kmeans = KMeans(n_clusters=k, random_state=5) # Lu's
+    # kmeans = KMeans(n_clusters=k, random_state=134) # Greg's
     label = kmeans.fit_predict(df_norm)
-
     centroids = kmeans.cluster_centers_
-    return label, centroids
+    inertia = kmeans.inertia_
+    return label, centroids, inertia
 
 def convert_centroids_toDF(centroids):
-    print(type(centroids), len(centroids))
+    # print(type(centroids), len(centroids))
     df_centroids = pd.DataFrame(centroids)
     return df_centroids
 
@@ -134,8 +136,6 @@ def plotting_clusters_plotly(df_norm, label, parameters):
     return fig
 
 def plotting_clusters_plotly_with_centroids(df_norm, label, centroids, parameters):
-    from plotly.offline import init_notebook_mode, iplot
-
     filtered_label0 = df_norm[label == 0]
     filtered_label1 = df_norm[label == 1]
     filtered_label2 = df_norm[label == 2]
@@ -264,7 +264,8 @@ def plotting_clusters_plotly_with_centroids(df_norm, label, centroids, parameter
                cluster1, cluster2, cluster3]
 
     fig = dict(data=my_data, layout=layout)
-    iplot(fig, filename='3d point clustering')
+    # Use py.iplot() for IPython notebook
+    return fig
 
 def post_processing(df_training_,label):
     print("Starting post processing:\n",df_training_)
@@ -289,7 +290,7 @@ def calculate_accuracy(df_training_):
     accuracy = 100-b
     return accuracy
 
-def plotting_var_correlation(df):
+def plotting_var_correlation(df, parameters):
     # -------------------------------Heat map to identify highly correlated variables-------------------------
     plt.figure(figsize=(10, 10))
     sns.heatmap(df.corr(),
@@ -298,6 +299,9 @@ def plotting_var_correlation(df):
                 center=0,
                 cbar=False,
                 cmap="YlGnBu")
+    plt.show()
+
+    sns.pairplot(df[parameters])
     plt.show()
 
 def plotting_outliers(df,parameters):
@@ -312,7 +316,6 @@ def plotting_outliers(df,parameters):
     plt.show()
 
 if __name__ == '__main__':
-
     idx_param = 1
     max_clusters = 10
     parameters=[["Salinity (ppt)","Temp C", "pH"],
@@ -328,7 +331,7 @@ if __name__ == '__main__':
     print("The descriptive stats for the selected parameters already filtered: \n", df_train.describe())
 
     print("Heat map to identify highly correlated variables:\n")
-    plotting_var_correlation(df_train)
+    plotting_var_correlation(df_train, parameter)
 
     print("Checking Outliers:\n")
     plotting_outliers(df_train, parameters[idx_param])
@@ -346,25 +349,56 @@ if __name__ == '__main__':
     print("K: ", kmodel.K)
     print("Silhouette Coefficient: ", len(kmodel.sil_coef), kmodel.sil_coef)
     kmodel.plotting_k_elbow_method()
-    #
+
     # """Silhouette Coefficient"""
     kmodel.plotting_silhouette()
     print("================================================================================")
 
     """Applying kmeans:"""
-    this_label, centroids = kmeans_method(df_norm)
-    print(this_label,len(this_label))
+    this_label, centroids, inertia = kmeans_method(df_norm, 3) #kmodel.K
+    print("this_label: ", this_label,len(this_label))
+    print("centroids: ", centroids, len(centroids))
+    print("inertia: ", inertia)
 
     """Calculating accuracy"""
     df_ = post_processing(df_all, this_label)
+    print(df_.head())
     accuracy = calculate_accuracy(df_)
     print("The accuracy of KMeans is: " + str(accuracy) + "%.")
 
     """Plotting the clusters"""
     df_centroids = convert_centroids_toDF(centroids)
-    # plotting_clusters_plotly_with_centroids(df_norm, this_label, df_centroids, parameter)
-    # fig = plotting_clusters_plotly(df_norm,this_label,centroids,parameter)
+    fig = plotting_clusters_plotly_with_centroids(df_norm, this_label, df_centroids, parameter)
+    # fig = plotting_clusters_plotly(df_norm,this_label,parameter)
     # iplot(fig, filename='3d point clustering')
+
+
+    y_test = df_['Target']
+    print("y_test values: ", y_test.unique())
+
+    y_pred = df_['Prediction']
+    print("y_pred values: ", y_pred.unique())
+    # Calculate the confusion matrix
+    conf_matrix = confusion_matrix(y_true=y_test, y_pred=y_pred)
+    print(conf_matrix)
+    # Print the confusion matrix using Matplotlib
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.matshow(conf_matrix, cmap=plt.cm.YlGnBu, alpha=0.3)
+    for i in range(conf_matrix.shape[0]):
+        for j in range(conf_matrix.shape[1]):
+            ax.text(x=j, y=i, s=conf_matrix[i, j], va='center', ha='center', size='xx-large')
+
+    plt.xlabel('Predictions', fontsize=18)
+    plt.ylabel('Actuals', fontsize=18)
+    plt.title('Confusion Matrix', fontsize=18)
+    plt.show()
+
+    print('Precision: %.3f' % precision_score(y_test, y_pred))
+    print('Recall: %.3f' % recall_score(y_test, y_pred))
+    print('Accuracy: %.3f' % accuracy_score(y_test, y_pred))
+    print('F1 Score: %.3f' % f1_score(y_test, y_pred))
+
     print("Done")
     # TODO: precision, recall and f1 measure for all different combination of 3 parameters
     # Source: https://www.guavus.com/technical-blog/unsupervised-machine-learning-validation-techniques/
+
